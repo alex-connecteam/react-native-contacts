@@ -14,7 +14,8 @@
 
     RCTPromiseResolveBlock updateContactPromise;
     CNMutableContact* selectedContact;
-    
+    NSString* viewBackgroundColorString;
+
     BOOL notesUsageEnabled;
 }
 
@@ -22,6 +23,7 @@
 {
     self = [super init];
     if (self) {
+        viewBackgroundColorString = NULL;
         [self preLoadContactView];
     }
     return self;
@@ -56,7 +58,7 @@ RCT_REMAP_METHOD(getAll, withResolver:(RCTPromiseResolveBlock) resolve
 }
 
 
-RCT_EXPORT_METHOD(checkPermission:(RCTPromiseResolveBlock) resolve 
+RCT_EXPORT_METHOD(checkPermission:(RCTPromiseResolveBlock) resolve
     rejecter:(RCTPromiseRejectBlock) __unused reject)
 {
     CNAuthorizationStatus authStatus = [CNContactStore authorizationStatusForEntityType:CNEntityTypeContacts];
@@ -86,6 +88,21 @@ RCT_EXPORT_METHOD(requestPermission:(RCTPromiseResolveBlock) resolve rejecter:(R
 RCT_EXPORT_METHOD(iosEnableNotesUsage:(BOOL) enabled)
 {
     notesUsageEnabled = enabled;
+}
+
+RCT_EXPORT_METHOD(setNavigationViewBackgroundColorString:(NSString *)str)
+{
+    //NSString *str = @"1 0.96 0.75 1";
+    viewBackgroundColorString = str;
+}
+
+- (void)applyNavigationViewBackgroundColorIfProvided:(UINavigationController*) navigation
+{
+    if (viewBackgroundColorString) {
+        CIColor *ciColor = [CIColor colorWithString:viewBackgroundColorString];
+        UIColor *uiColor = [UIColor colorWithRed:ciColor.red green:ciColor.green blue:ciColor.blue alpha:ciColor.alpha];
+        navigation.view.backgroundColor = uiColor;
+    }
 }
 
 RCT_EXPORT_METHOD(getContactsMatchingString:(NSString *)string resolver:(RCTPromiseResolveBlock) resolve
@@ -121,7 +138,7 @@ RCT_EXPORT_METHOD(getContactsMatchingString:(NSString *)string resolver:(RCTProm
     if(notesUsageEnabled) {
         [keys addObject: CNContactNoteKey];
     }
-    
+
     NSArray *arrayOfContacts = [store unifiedContactsMatchingPredicate:[CNContact predicateForContactsMatchingName:searchString]
                                                            keysToFetch:keys
                                                                  error:&contactError];
@@ -482,7 +499,7 @@ RCT_EXPORT_METHOD(getCount:(RCTPromiseResolveBlock) resolve rejecter:(RCTPromise
 
     [output setObject:postalAddresses forKey:@"postalAddresses"];
     //end postal addresses
-    
+
     //handle instant message addresses
     NSMutableArray *imAddresses = [[NSMutableArray alloc] init];
 
@@ -687,7 +704,7 @@ RCT_EXPORT_METHOD(addContact:(NSDictionary *)contactData resolver:(RCTPromiseRes
     }
 }
 
-RCT_EXPORT_METHOD(openContactForm:(NSDictionary *)contactData 
+RCT_EXPORT_METHOD(openContactForm:(NSDictionary *)contactData
     resolver:(RCTPromiseResolveBlock) resolve
     rejecter:(RCTPromiseRejectBlock) __unused reject)
 {
@@ -702,6 +719,9 @@ RCT_EXPORT_METHOD(openContactForm:(NSDictionary *)contactData
 
     dispatch_async(dispatch_get_main_queue(), ^{
         UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:controller];
+
+        [self applyNavigationViewBackgroundColorIfProvided:navigation];
+
         UIViewController *viewController = (UIViewController*)[[[[UIApplication sharedApplication] delegate] window] rootViewController];
         while (viewController.presentedViewController)
             {
@@ -744,6 +764,8 @@ RCT_EXPORT_METHOD(openExistingContact:(NSDictionary *)contactData resolver:(RCTP
 
         dispatch_async(dispatch_get_main_queue(), ^{
             UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:contactViewController];
+
+            [self applyNavigationViewBackgroundColorIfProvided:navigation];
 
             UIViewController *currentViewController = [UIApplication sharedApplication].keyWindow.rootViewController;
 
@@ -832,6 +854,8 @@ RCT_EXPORT_METHOD(viewExistingContact:(NSDictionary *)contactData resolver:(RCTP
         dispatch_async(dispatch_get_main_queue(), ^{
             UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:contactViewController];
 
+            [self applyNavigationViewBackgroundColorIfProvided:navigation];
+
             UIViewController *currentViewController = [UIApplication sharedApplication].keyWindow.rootViewController;
 
             while (currentViewController.presentedViewController)
@@ -900,7 +924,7 @@ RCT_EXPORT_METHOD(editExistingContact:(NSDictionary *)contactData resolver:(RCTP
 
         CNSaveRequest *request = [[CNSaveRequest alloc] init];
         [request updateContact:record];
-        
+
         selectedContact = record;
 
         [contactStore executeSaveRequest:request error:nil];
@@ -912,20 +936,23 @@ RCT_EXPORT_METHOD(editExistingContact:(NSDictionary *)contactData resolver:(RCTP
             message:@"Number added to contact"
             preferredStyle:UIAlertControllerStyleAlert];
         //[controller presentViewController:alert animated:YES completion:nil];
-        
+
         // Add a cancel button which will close the view
         controller.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Done"  style:UIBarButtonItemStylePlain target:self action:@selector(doneContactForm)];
-        
+
         controller.delegate = self;
         controller.allowsEditing = true;
         controller.allowsActions = true;
 
         dispatch_async(dispatch_get_main_queue(), ^{
             UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:controller];
+
+            [self applyNavigationViewBackgroundColorIfProvided:navigation];
+
             UIViewController *viewController = (UIViewController*)[[[[UIApplication sharedApplication] delegate] window] rootViewController];
-            
+
             //navigation.navigationBar.titleTextAttributes = @{NSForegroundColorAttributeName : [UIColor redColor]};
-            
+
             while (viewController.presentedViewController)
                 {
                     viewController = viewController.presentedViewController;
@@ -935,7 +962,7 @@ RCT_EXPORT_METHOD(editExistingContact:(NSDictionary *)contactData resolver:(RCTP
 
             self->updateContactPromise = resolve;
         });
-        
+
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
 
                 [alert dismissViewControllerAnimated:YES completion:^{
@@ -1055,7 +1082,7 @@ RCT_EXPORT_METHOD(updateContact:(NSDictionary *)contactData resolver:(RCTPromise
     contact.middleName = middleName;
     contact.organizationName = company;
     contact.jobTitle = jobTitle;
-    
+
     if(notesUsageEnabled){
         NSString *note = [contactData valueForKey:@"note"];
         contact.note = note;
@@ -1153,9 +1180,9 @@ RCT_EXPORT_METHOD(updateContact:(NSDictionary *)contactData resolver:(RCTPromise
     }
 
     contact.postalAddresses = postalAddresses;
-    
+
     NSMutableArray<CNLabeledValue<CNInstantMessageAddress*>*> *imAddresses = [[NSMutableArray alloc] init];
-    
+
     for (id imData in [contactData valueForKey:@"imAddresses"]) {
         NSString *service = [imData valueForKey:@"service"];
         NSString *username = [imData valueForKey:@"username"];
@@ -1195,9 +1222,9 @@ enum { WDASSETURL_PENDINGREADS = 1, WDASSETURL_ALLFINISHED = 0};
 
 + (NSData *)loadImageAsset:(NSURL *)assetURL {
     __block NSData *imageData = nil;
-    
+
     dispatch_semaphore_t semaphore = dispatch_semaphore_create(0);
-    
+
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
         PHFetchResult<PHAsset *> *result = [PHAsset fetchAssetsWithALAssetURLs:@[assetURL] options:nil];
         if (result.count > 0) {
@@ -1205,7 +1232,7 @@ enum { WDASSETURL_PENDINGREADS = 1, WDASSETURL_ALLFINISHED = 0};
             PHImageManager *imageManager = [PHImageManager defaultManager];
             PHImageRequestOptions *options = [[PHImageRequestOptions alloc] init];
             options.synchronous = YES; // Load image synchronously
-            
+
             [imageManager requestImageDataForAsset:asset
                                           options:options
                                     resultHandler:^(NSData * _Nullable data, NSString * _Nullable dataUTI, UIImageOrientation orientation, NSDictionary * _Nullable info) {
@@ -1216,9 +1243,9 @@ enum { WDASSETURL_PENDINGREADS = 1, WDASSETURL_ALLFINISHED = 0};
             dispatch_semaphore_signal(semaphore);
         }
     });
-    
+
     dispatch_semaphore_wait(semaphore, DISPATCH_TIME_FOREVER);
-    
+
     return imageData;
 }
 
@@ -1250,7 +1277,7 @@ RCT_EXPORT_METHOD(deleteContact:(NSDictionary *)contactData resolver:(RCTPromise
 }
 
 RCT_EXPORT_METHOD(writePhotoToPath:(nonnull NSString *)path resolver:(RCTPromiseResolveBlock) resolve rejecter:(RCTPromiseRejectBlock) reject)
-{ 
+{
     @try {
         //Nothing is implemented here
     } @catch (NSException *exception) {
@@ -1290,27 +1317,27 @@ RCT_EXPORT_METHOD(getGroup:(NSString *)identifier resolver:(RCTPromiseResolveBlo
         // contactsStore method handles rejection
         return;
     }
-    
+
     NSError *error = nil;
     NSPredicate *predicate = [CNGroup predicateForGroupsWithIdentifiers:@[identifier]];
     NSArray<CNGroup *> *groups = [contactStore groupsMatchingPredicate:predicate error:&error];
-    
+
     if (error) {
         reject(@"get_group_error", @"Failed to fetch group", error);
         return;
     }
-    
+
     if (groups.count == 0) {
         reject(@"get_group_not_found", @"No group found with the given identifier", nil);
         return;
     }
-    
+
     CNGroup *group = groups.firstObject;
     NSDictionary *groupDict = @{
         @"identifier": group.identifier ?: @"",
         @"name": group.name ?: @""
     };
-    
+
     resolve(groupDict);
 }
 
@@ -1446,7 +1473,7 @@ RCT_EXPORT_METHOD(contactsInGroup:(NSString *)identifier
     if (!store) {
         return;
     }
-    
+
     NSError *error = nil;
     NSPredicate *predicate = [CNContact predicateForContactsInGroupWithIdentifier:identifier];
     NSArray *keysToFetch = @[
@@ -1465,26 +1492,26 @@ RCT_EXPORT_METHOD(contactsInGroup:(NSString *)identifier
         CNContactBirthdayKey,
         CNContactInstantMessageAddressesKey
     ];
-    
+
     if (notesUsageEnabled) {
         keysToFetch = [keysToFetch arrayByAddingObject:CNContactNoteKey];
     }
-    
+
     CNContactFetchRequest *fetchRequest = [[CNContactFetchRequest alloc] initWithKeysToFetch:keysToFetch];
     fetchRequest.predicate = predicate;
-    
+
     NSMutableArray *contacts = [NSMutableArray array];
-    
+
     BOOL success = [store enumerateContactsWithFetchRequest:fetchRequest error:&error usingBlock:^(CNContact * _Nonnull contact, BOOL * _Nonnull stop) {
         NSDictionary *contactDict = [self contactToDictionary:contact withThumbnails:true];
         [contacts addObject:contactDict];
     }];
-    
+
     if (!success) {
         reject(@"contacts_in_group_error", @"Failed to fetch contacts in group", error);
         return;
     }
-    
+
     resolve(contacts);
 }
 
@@ -1497,35 +1524,35 @@ RCT_EXPORT_METHOD(addContactsToGroup:(NSString *)groupId
     if (!contactStore) {
         contactStore = [[CNContactStore alloc] init];
     }
-    
+
     // Check authorization
     CNAuthorizationStatus authStatus = [CNContactStore authorizationStatusForEntityType:CNEntityTypeContacts];
     if (authStatus != CNAuthorizationStatusAuthorized && authStatus != CNAuthorizationStatusLimited) {
         reject(@"permission_denied", @"Contacts permission denied", nil);
         return;
     }
-    
+
     NSError *error = nil;
-    
+
     // Fetch the group
     NSPredicate *predicate = [CNGroup predicateForGroupsWithIdentifiers:@[groupId]];
     NSArray<CNGroup *> *groups = [contactStore groupsMatchingPredicate:predicate error:&error];
-    
+
     if (error) {
         reject(@"group_fetch_error", @"Failed to fetch group", error);
         return;
     }
-    
+
     if (groups.count == 0) {
         reject(@"group_not_found", @"No group found with the given identifier", nil);
         return;
     }
-    
+
     CNGroup *group = groups.firstObject;
-    
+
     // Initialize CNSaveRequest
     CNSaveRequest *saveRequest = [[CNSaveRequest alloc] init];
-    
+
     // Iterate over contactIds and add each contact to the group
     for (NSString *contactId in contactIds) {
         // Fetch the contact
@@ -1537,19 +1564,19 @@ RCT_EXPORT_METHOD(addContactsToGroup:(NSString *)groupId
             reject(@"contact_fetch_error", [NSString stringWithFormat:@"Failed to fetch contact with ID %@", contactId], contactError);
             return;
         }
-        
+
         if (!contact) {
             reject(@"contact_not_found", [NSString stringWithFormat:@"No contact found with ID %@", contactId], nil);
             return;
         }
-        
+
         // Add contact to group
         [saveRequest addMember:contact toGroup:group];
     }
-    
+
     // Execute the save request
     BOOL success = [contactStore executeSaveRequest:saveRequest error:&error];
-    
+
     if (success) {
         resolve(@(YES));
     } else {
@@ -1657,11 +1684,11 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
 
 #endif
 
-- (void)getAll:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject { 
+- (void)getAll:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
     [self getAllContacts:resolve reject:reject withThumbnails:true];
 }
 
- - (void)checkPermission:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject { 
+ - (void)checkPermission:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
      CNAuthorizationStatus authStatus = [CNContactStore authorizationStatusForEntityType:CNEntityTypeContacts];
      if (authStatus == CNAuthorizationStatusDenied || authStatus == CNAuthorizationStatusRestricted){
          resolve(@"denied");
@@ -1751,7 +1778,7 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
 
          CNSaveRequest *request = [[CNSaveRequest alloc] init];
          [request updateContact:record];
-         
+
          selectedContact = record;
 
          [contactStore executeSaveRequest:request error:nil];
@@ -1763,20 +1790,23 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
              message:@"Number added to contact"
              preferredStyle:UIAlertControllerStyleAlert];
          //[controller presentViewController:alert animated:YES completion:nil];
-         
+
          // Add a cancel button which will close the view
          controller.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Done"  style:UIBarButtonItemStylePlain target:self action:@selector(doneContactForm)];
-         
+
          controller.delegate = self;
          controller.allowsEditing = true;
          controller.allowsActions = true;
 
          dispatch_async(dispatch_get_main_queue(), ^{
              UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:controller];
+
+             [self applyNavigationViewBackgroundColorIfProvided:navigation];
+
              UIViewController *viewController = (UIViewController*)[[[[UIApplication sharedApplication] delegate] window] rootViewController];
-             
+
              //navigation.navigationBar.titleTextAttributes = @{NSForegroundColorAttributeName : [UIColor redColor]};
-             
+
              while (viewController.presentedViewController)
                  {
                      viewController = viewController.presentedViewController;
@@ -1786,7 +1816,7 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
 
              self->updateContactPromise = resolve;
          });
-         
+
          dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
 
                  [alert dismissViewControllerAnimated:YES completion:^{
@@ -1802,7 +1832,7 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
  }
 
 
- - (void)getAllWithoutPhotos:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject { 
+ - (void)getAllWithoutPhotos:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
      [self getAllContacts:resolve reject:reject withThumbnails:false];
  }
 
@@ -1859,7 +1889,7 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
  }
 
 
- - (void)getCount:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject { 
+ - (void)getCount:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
      [self getAllContactsCount:resolve reject:reject];
  }
 
@@ -1895,23 +1925,26 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
 
 - (void)openContactForm:(NSDictionary *)contactData resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
     CNMutableContact * contact = [[CNMutableContact alloc] init];
-    
+
     [self updateRecord:contact withData:contactData];
-    
+
     CNContactViewController *controller = [CNContactViewController viewControllerForNewContact:contact];
-    
-    
+
+
     controller.delegate = self;
-    
+
     dispatch_async(dispatch_get_main_queue(), ^{
         UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:controller];
+
+        [self applyNavigationViewBackgroundColorIfProvided:navigation];
+
         UIViewController *viewController = (UIViewController*)[[[[UIApplication sharedApplication] delegate] window] rootViewController];
         while (viewController.presentedViewController)
         {
             viewController = viewController.presentedViewController;
         }
         [viewController presentViewController:navigation animated:YES completion:nil];
-        
+
         self->updateContactPromise = resolve;
     });
 }
@@ -1946,6 +1979,8 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
 
          dispatch_async(dispatch_get_main_queue(), ^{
              UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:contactViewController];
+
+             [self applyNavigationViewBackgroundColorIfProvided:navigation];
 
              UIViewController *currentViewController = [UIApplication sharedApplication].keyWindow.rootViewController;
 
@@ -2003,7 +2038,7 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
  }
 
 
- - (void)requestPermission:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject { 
+ - (void)requestPermission:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
      CNContactStore* contactStore = [[CNContactStore alloc] init];
 
         [contactStore requestAccessForEntityType:CNEntityTypeContacts completionHandler:^(BOOL granted, NSError * _Nullable error) {
@@ -2087,6 +2122,8 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
          dispatch_async(dispatch_get_main_queue(), ^{
              UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:contactViewController];
 
+             [self applyNavigationViewBackgroundColorIfProvided:navigation];
+
              UIViewController *currentViewController = [UIApplication sharedApplication].keyWindow.rootViewController;
 
              while (currentViewController.presentedViewController)
@@ -2106,7 +2143,7 @@ RCT_EXPORT_METHOD(removeContactsFromGroup:(NSString *)groupId
  }
 
 
- - (void)writePhotoToPath:(NSString *)contactId file:(NSString *)file resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject { 
+ - (void)writePhotoToPath:(NSString *)contactId file:(NSString *)file resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject {
      reject(@"Error", @"not implemented", nil);
  }
 
